@@ -334,22 +334,22 @@
     <br/>
     <br/>
 
-    We noticed that the algorithm we use to implementing upsampling has certain effects on the output.
-    For example, corners of the mesh's tend to look slightly weird. As a result, the new renderings
-    look less cubic/spherical. A part of the reason for this is due to the initial shape of the mesh,
-    but also due to the averaging and upsampling algorithm. Since the algorithm recalculates a point's
-    location based on it's neighbors, this can cause unexpected outcomes such as smoothening the corners
-    of an object. Additionally, the orginal mesh shape was split into two triangles for the faces of each cube. This distribution could have potentially
-    led to the skewed shape we noticed.
+    We noticed that the upsampling algorithm has certain effects on the output.
+    For example, on a cube made with a triangle mesh with only a single diagonal on each face, the corners of the mesh
+    start to look asymmetric as we upsample. A part of the reason for this is due to the initial shape of the mesh; the
+    asymmetric nature of the cube face diagonals is exaggerated by the upsampling algorithm. Since the algorithm
+    recalculates a point's
+    location based on it's neighbors, we also see the outcome that the corners
+    of the object get smoothened.
+    <br />
+    <br />
 
-    <br/>
-    <br/>
-
-    To try and fix this, we wanted to preprocess the cube and split each face into four equal triangles. We
-    accomplished this by splitting along the diagonal edge of each face. As a result, our loop sub-division
-    algorithm should perform upscaling more symmetrically. Unfortunately, this did not help with the problem
-    of upsampling rounding the edges and corners of the cube.
-
+    To fix the issue of asymmetry, we preprocessed the cube and split each face into four equal
+    triangles. We
+    accomplished this by splitting along the diagonal edge of each face. As a result, our loop subdivision
+    algorithm upsamples the cube more symmetrically.
+    However, this did not affect the rounding of edges and corners of the cube.
+    
     <div align="middle">
           <table style="width=800%">
             <tr>
