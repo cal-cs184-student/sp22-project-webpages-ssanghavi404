@@ -1,7 +1,322 @@
-<html>
-	<head>
-	</head>
-	<body>
-		Project 3-2 here
-	</body>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+
+
+<head>
+  <style>
+    body {
+      padding: 100px;
+      width: 1000px;
+      margin: auto;
+      text-align: left;
+      font-weight: 300;
+      font-family: 'Open Sans', sans-serif;
+      color: #121212;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4 {
+      font-family: 'Source Sans Pro', sans-serif;
+    }
+  </style>
+  <title>CS 184 Path Tracer</title>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+  <link rel="stylesheet" type="text/css" href="style.css" media="screen" />
+</head>
+
+<body>
+  <br />
+  <h1 align="middle">Assignment 3-2: PathTracer and Surface Materials</h1>
+  <h2 align="middle">Rishi Parikh, Saagar Sanghavi</h2>
+
+
+  <div class="padded">
+    <div align="center">
+      <table style="width=100%">
+        <tr>
+          <td align="middle">
+            <img src="images/dragon_05.png" width="640" />
+            <figcaption align="middle"></figcaption>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <p>In this project, we added additional functionality to our Pathtracer from Project 3-1 to allow for different
+      surfaces
+      of objects in our scene. In the previous part of the project, most of our objects had a Lambertian diffuse
+      surface,
+      which meant that any incoming light would bounce off equally in all directions. In this project, we added
+      functionality for surfaces like mirrors that would reflect light directly opposite the angle of incidence, or
+      glass
+      through which light could refract. In addition to mirror and glass materials, we implemented the Microfacet BSDF,
+      which allows us to use an alpha parameter to control the "roughness" of the surface. The main challenges we faced
+      were
+      making sure to implement the equations that model light behavior correctly (ex. Snell's Law, Fresnel Equations) as
+      well as the equations to model the microfacet surface—thankfully, it ended up being relatively easy to debug since
+      we
+      worked out all the closed-form solutions with paper and pencil beforehand, and all we had to do was to make sure
+      we
+      correctly translated those equations into code.</p>
+    <h1 align="middle">Task 1: Mirror and Glass Materials</h1>
+    <p>
+      In this task, we implemented rendering of of two simple non-lambertian BSDFs: mirror and glass surfaces.
+      We implemented two helper
+      functions that output a wi given a wo: reflect and refract. Reflection was done in local
+      coordinates which means that reflecting a ray means reflecting across the z axis.
+      Refraction was a bit more complicated. In order to implement refraction, we had to consider a few
+      possibilities. We first determined whether the ray was entering or exiting the object, using the dot product
+      between wo and the normal (again in localized coordinates). We use Snell's Law to test if there is total internal
+      reflection, and if not we update wi.
+
+      To sample mirror and refractive surfaces, we utilize the above helper functions. For glass BSDF
+      we must account for the cosine of the reflected ray and return:
+    <pre align="middle">reflectance / abs_cos(wi)</pre>
+    Similarly, for refraction, we return
+    <pre align="middle">transmittance / abs_cos(wi) / eta^2</pre>
+    </br>
+    </br>
+    Lastly, we combine refraction and reflection to sample from glass objects. If there is total internal
+    reflection, we use reflect to calculate wi. Otherwise, we compute Schlick's coefficient as an approximation for the
+    Fresnel Equations, and call our helper functions to perform
+    reflection with probability R, else refraction. We update the pdf respectively.
+    </p>
+    <h3>Mirror and Glass Spheres, varying the max ray depth</h3>
+    <p>The images below show a scene with one mirror sphere and one glass sphere, varying the maximum number of
+      surface-air interactions ("bounces") that a ray can take. Note that a light ray hitting glass from the air is
+      considered a "bounce". </p>
+    <div align="center">
+      <table style="width=100%">
+        <tr>
+          <td align="middle">
+            <img src="images/spheres_0.png" width="480px" />
+            <figcaption align="middle">m = 0</figcaption>
+          </td>
+          <td align="middle">
+            <img src="images/spheres_1.png" width="480px" />
+            <figcaption align="middle">m = 1</figcaption>
+          </td>
+        </tr>
+        <tr>
+          <td align="middle">
+            <img src="images/spheres_2.png" width="480px" />
+            <figcaption align="middle">m = 2</figcaption>
+          </td>
+          <td align="middle">
+            <img src="images/spheres_3.png" width="480px" />
+            <figcaption align="middle">m = 3</figcaption>
+          </td>
+        </tr>
+        <tr>
+          <td align="middle">
+            <img src="images/spheres_4.png" width="480px" />
+            <figcaption align="middle">m = 4</figcaption>
+          </td>
+          <td align="middle">
+            <img src="images/spheres_5.png" width="480px" />
+            <figcaption align="middle">m = 5</figcaption>
+          </td>
+        </tr>
+        <tr>
+          <td align="middle">
+            <img src="images/spheres_100.png" width="480px" />
+            <figcaption align="middle">m = 100</figcaption>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <p>Let's look at some of the visual effects varying the max number of bounces.</p>
+    <b>m = 0</b> We are only able to see the light sources (ie zero bounce illumination). Nothing too interesting here.
+    </br>
+    </br>
+
+    <b>m = 1</b> We cannot see the whole spheres (ie. they are black). We see the walls (as light reflects directly from
+    the light off the walls into the viewer) and we see the reflection of the light source on the spheres.
+    Note that mirror sphere has a clear single-bounce reflection of the light source itself, while the glass also has a
+    slightly fainter reflection.
+    </br>
+    </br>
+
+    <b>m = 2</b> In this scene, we can start to make out the contents of the mirror and glass spheres.
+    The mirror shows the room, and a black ball representing the glass sphere (This is equal to the visualization of the
+    glass sphere with m = 1). For all future steps, the glass ball shown in the mirror will be equal to the glass ball
+    with 1 less bounce, because one bounce will hit the mirror and m - 1 bounces will be left once it hits the glass
+    ball.
+    The glass ball shows a faint, reflection of the room. Most refracted rays are not yet visible with 2 bounces because
+    we consider the refraction as a light ray enters and exits the material as two separate bounces.
+    Both of the spheres are dark due to limited bounces to collect light.
+
+    </br>
+    </br>
+
+    <b>m = 3</b> In this scene, we can see a representation of what the spheres should actually look like. Now,
+    both reflection and refraction rays are being captured in the glass sphere. We can note the white light
+    at the bottom of the glass sphere due to rays that refract through the glass, then are reflected off the ground into
+    the viewer. This takes three bounces, because a refracted
+    ray has to enter then exit the glass sphere before bouncing off the ground. The reflected glass sphere on the mirror
+    sphere is still dark since it is from one less bounce, as mentioned earlier. Both scenes are brighter.
+    </br>
+    </br>
+
+    <b>m = 4</b> At m = 4, we can see the glass ball (as represented at m = 3) within the mirror ball.
+    Additionally, we can see that there is a spot of
+    light on the right hand side wall generated from the glass ball. This is from light rays that reflects off the
+    mirror, refract through the sphere and goes onto the wall, then finally reflect off the wall and into the viewer.
+    </br>
+    </br>
+
+    <b>m = 5</b> Between m = 4 and m = 5, it is hard to tell big differences between the images. To me this means that
+    there have been adequate bounces of light to represent most if not all of the features of the glass and
+    mirror spheres. The only difference is that m = 5 in generally brighter due to the extra bounce rays that are now
+    being considered.
+    </br>
+    </br>
+
+    <b>m = 100</b> At m = 100, we can see that the image gets brighter as there is more bounces to collect light.
+    We do not see the the grainy particles scattered across the scene decrease as we did in the previous part.
+    This is probably because these spots may not be due to lack of sampling, but due to random reflected and
+    refracted bounces.
+
+
+    <h1 align="middle">Task 2: Microfacet Material</h1>
+    <p>
+      For this task, we implemented microfacet materials to render smooth and rough isotropic matals. To
+      calculate the evaluation for a given BRDF and ray, we need the Fresnel term, normal distribution
+      function, shadow-masking term, and halfvector h.
+
+      We model normal distribution function using Beckmann's distribution with parameter theta_h (of the halfvector),
+      and use a hyperparameter alpha which controls smoothness of the surface. Small alpha means the object is closer to
+      a smooth mirror, while larger alpha means the object is closer to a rough surface.
+
+      The fresnel term is computed for the R, G, and B values seperately as eta and k have independent
+      values for each of the three values. We can then plug in the eta, k, and theta values to the
+      air-conductor Fresnel equations.
+
+      Lastly, we perform importance sampling to sample with respect to the Beckmann integration curve.
+      In this integration, we need to sample two random variables between 0 and 1. We can then use the
+      formulas provided to get theta and phi and can then reconstruct the vector h using these values, converting
+      spherical coordinates to rectangular:
+    <pre align="center">h.x = cos(phi_h) * sin(theta_h)</pre>
+    <pre align="center">h.y = sin(phi_h) * sin(theta_h)</pre>
+    <pre align="center">h.z = cos(theta_h)</pre>
+
+    We can also calculate the incident ray corresponding to a reflected ray. Using the fact that the angle of incidence
+    matches the angle of reflection and doing some vector algebra, we obtain:
+    <pre align="center">wi = 2(wo ⋅ h)h  − wo</pre>
+
+    Finally, we have to update the PDF of the sample. We also ensure the dot product of wo, n and wi, n
+    are both greater than 0, otherwise return an empty vector3d.
+    </p>
+
+    <h3>Dragons with gold microfacet, varying roughness parameter (alpha)</h3>
+    <div align="center">
+      <table style="width=100%">
+        <tr>
+          <td align="middle">
+            <img src="images/dragon_005.png" width="480px" />
+            <figcaption align="middle">alpha = 0.005</figcaption>
+          </td>
+          <td align="middle">
+            <img src="images/dragon_05.png" width="480px" />
+            <figcaption align="middle">alpha = 0.05</figcaption>
+          </td>
+        </tr>
+        <tr>
+          <td align="middle">
+            <img src="images/dragon_25.png" width="480px" />
+            <figcaption align="middle">alpha = 0.25</figcaption>
+          </td>
+          <td align="middle">
+            <img src="images/dragon_5.png" width="480px" />
+            <figcaption align="middle">alpha = 0.5</figcaption>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <p>
+      As we change the alpha parameter, we are changing the roughness of the BSDF. An alpha value of 0.005 will
+      represent a very smooth material, while 0.5 will be rougher. This roughness can be visualized by graphing
+      the Beckmann distribution with different values of alpha. Qualatatively, the smoother images with smaller
+      alphas look more glossy, but also darker. Another interesting effect is when alpha is very low, it looks
+      one can see pixels of light that bounced off of the dragon bsdf on the walls. As we increase alpha, we can
+      see that the dragon itself looks more matte, but brighter as well.
+    </p>
+
+    <h3>Bunny with copper microfacet, varying sampling rate</h3>
+    <div align="center">
+      <table style="width=100%">
+        <tr>
+          <td align="middle">
+            <img src="images/bunny_hemisphere.png" width="480px" />
+            <figcaption align="middle">uniform hemisphere sampling</figcaption>
+          </td>
+          <td align="middle">
+            <img src="images/bunny_importance.png" width="480px" />
+            <figcaption align="middle">importance sampling</figcaption>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <p>
+      Using uniform hemisphere sampling, we run into a similar problem as we had in the first pathtracer project.
+      In this situation, we are not sampling important values to the normal distribution function. Hence, a lot
+      of the samples that we generate may have a small weight or probability of actually occuring. As a result, in the
+      images shown, the hemisphere sampling example tends to be grainy, but captures the main features of the bunny,
+      such as the brightness on the top and bottom of the bunny.
+      </br>
+      </br>
+      To contrast, in the second example we use important sampling using the inverse of the Beckmann distribution.
+      This means that the samples we choose from are more likely to be important values with respect to the PDF.
+      We no longer need as many samples per pixel, and instead, the same number of samples can give a much smoother
+      result. We continue to see the reflections such as the light from the top of the room shine on the bunny, and
+      darker spots that may be in the shadow of the light.
+    </p>
+
+    <h3>Dragon with chromium microfacet</h3>
+    <div align="center">
+      <table style="width=100%">
+        <tr>
+          <td align="middle">
+            <img src="images/dragon_chromium.png" width="640" />
+            <figcaption align="middle">Dragon with chromium BSDF</figcaption>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <p>
+      We queried https://refractiveindex.info at the R, G, B wavelengths to get the following parameter values that
+      correspond to the metal chromium:
+    </p>
+    <p>
+      Red:&nbsp&nbsp&nbsp Refractive index[i]: n = 3.1743,
+      Extinction coefficient[i]:
+      k = 3.3000
+      </br>
+      Green: Refractive index[i]:
+      n = 3.1800,
+      Extinction coefficient[i]:
+      k = 3.3300
+      </br>
+      Blue:&nbsp&nbsp Refractive index[i]:
+      n = 2.4650,
+      Extinction coefficient[i]:
+      k = 3.2150
+    </p>
+    <p>The result is quite beautiful. </p>
+    <h2 align="middle">Final Thoughts</h2>
+
+    <p align="left">
+      As a partner project, this was a very collaborative experience and we needed to rely on one another to
+      get the project working. Both of us met up on Zoom to worked on the
+      project and worked on Saagar's computer, since Rishi's computer had the Apple M1 Chip and couldn't run the
+      staff-provided binary files. Towards the end, Saagar focused on
+      generating high-quality images while Rishi focused on completing the writeup.
+    </p>
+  </div>
+</body>
+
 </html>
